@@ -1,3 +1,4 @@
 [submodule "external/autoibamr"]
 	path = external/autoibamr
 	url = https://github.com/ibamr/autoibamr.git
+	ignore = untracked # autoibamr writes autoibamr.log next to itself
