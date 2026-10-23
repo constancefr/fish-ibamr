@@ -1,0 +1,3 @@
+[submodule "external/autoibamr"]
+	path = external/autoibamr
+	url = https://github.com/ibamr/autoibamr.git
