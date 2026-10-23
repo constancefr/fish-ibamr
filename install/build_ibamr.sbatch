@@ -22,6 +22,7 @@ trap 'rm -rf "$SCRATCH" "$PREFIX/tmp"' EXIT   # clean up when the job ends, even
 # Slurm runs a copy of this script, so locate the repo from where it was submitted.
 AUTOIBAMR="$SLURM_SUBMIT_DIR/external/autoibamr/autoibamr.sh"
 [ -x "$AUTOIBAMR" ] || { echo "Submit from the fish-ibamr root (not found: $AUTOIBAMR)"; exit 1; }
-"$AUTOIBAMR" --prefix="$PREFIX" --jobs="$SLURM_CPUS_PER_TASK" --yes
+# NOTE: libMesh disabled until libtirpc-dev (XDR headers) is installed: IBAMR requires libMesh with XDR.
+"$AUTOIBAMR" --prefix="$PREFIX" --jobs="$SLURM_CPUS_PER_TASK" --yes --disable-libmesh
 
 
