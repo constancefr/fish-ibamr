@@ -1,0 +1,47 @@
+{
+  "case_name": "base",
+  "geom": {
+    "pitch_axis_world": [
+      0.4,
+      0.6
+    ],
+    "pitch_axis_from_LE": 0.03,
+    "rigid_length": 0.06,
+    "E_flex": 10000.0,
+    "rho_solid": 1064.6,
+    "init_q": [
+      1.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "fill_density_multiplier": 4.0,
+    "fill_spacing": null,
+    "stiffness_scale": null,
+    "target_stiffness_factor": 3.0
+  },
+  "flow": {
+    "U": 0.2,
+    "aoa_deg": [
+      0.0,
+      15.0
+    ],
+    "aoa_switch_time": 5.0,
+    "aoa_ramp": 0.1,
+    "fringe_x": [
+      1.0,
+      1.2
+    ],
+    "fringe_ramp": 0.05,
+    "fringe_rate": 40.0,
+    "mean_rate": 20.0,
+    "start_ramp": 0.02
+  },
+  "output": {
+    "field_interval": 0.05
+  },
+  "diagnostics": {
+    "interval": 0.01,
+    "save_every": 1.0
+  }
+}
