@@ -268,9 +268,9 @@ def mesh_info(w):
         n_fill_points=len(w['xr']) - n_edge,
         n_points=len(w['xr']), n_triangles=len(w['triangles']), n_springs=len(w['connections']),
         stiffness_scale=w['stiffness_scale'], stiffness_scale_measured=w['stiffness_scale_measured'],
-        k_median=float(np.median(k)), k_max=float(k.max()),
+        k_median=float(np.median(k)) * w['ds'], k_max=float(k.max()) * w['ds'],   # physical [N/m], as in the files
         n_target_points=len(w['target_idx']), n_clamp_points=len(w['clamp_idx']),
-        k_Target=w['k_Target'], te_index=w['te_index'],
+        k_Target=w['k_Target'] * w['ds'], te_index=w['te_index'],
         wing_area_m2=area, mesh_area_fraction=mesh_area / area,
         build_time_s=round(w['build_time'], 3),
     )

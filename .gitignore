@@ -12,3 +12,7 @@ cases/NACA0020/wing.*
 cases/NACA0020/wing_mesh.npz
 cases/NACA0020/mesh_info.json
 cases/NACA0020/geometry_preview.png
+# Slurm job logs
+cases/*/*.out
+
+cases/cluster_commands.txt

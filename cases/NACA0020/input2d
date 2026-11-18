@@ -1,10 +1,12 @@
-// NACA0020 wing, stage 1: the pre-bent wing released in still fluid (no free stream).
-// Values match the IB2d case (fish-ib2d cases/NACA0020_Wing at 9b21eda); see IMPLEMENTATION_DECISIONS.md.
+// NACA0020 wing, stage 2: free stream as in SoRoLily (U on all four faces, angle 0 -> 15 deg at 5 s).
+// Other values match the IB2d case (fish-ib2d cases/NACA0020_Wing at 9b21eda); see IMPLEMENTATION_DECISIONS.md.
 // Top-level `Nx` and `Lx` are also read by Wing_Geom.py (wing_case.read_input2d): keep them plain numbers.
 
+PI = 3.14159265358979
+
 // physical parameters
-Lx  = 1.2                    // domain side [m]
-MU  = 0.030069               // dynamic viscosity [Pa s], 30x water (IB2d's stable floor)
+Lx  = 1.2                   // domain side [m]
+MU  = 0.001               // dynamic viscosity [Pa s], 1x water (IB2d's stable floor)
 RHO = 1000.0                 // fluid density [kg/m^3]
 
 // grid
@@ -20,13 +22,59 @@ DATA_INTERVAL = 250
 
 // solver
 DELTA_FUNCTION      = "IB_4"           // Peskin's 4-point kernel, as IB2d's Supp.give_Delta_Kernel
-CONVECTIVE_OP_TYPE  = "CENTERED"       // IB2d: central differences, no upwinding
+CONVECTIVE_OP_TYPE  = "CUI"       // CUI
 CONVECTIVE_FORM     = "SKEW_SYMMETRIC" // IB2d: skew-symmetric form
 CONVECTIVE_TS_TYPE  = "ADAMS_BASHFORTH"
 NUM_CYCLES          = 1
 NORMALIZE_PRESSURE  = TRUE
 CFL_MAX             = 0.3
 ENABLE_LOGGING      = TRUE
+
+// Free stream U (cos a, sin a), a(t) = A1 * smoothstep((t - T_SW) / T_RAMP), as SoRoLily (gvs_tests.jl).
+// Faces: 0 left, 1 right, 2 bottom, 3 top. On each face a u + b du/dn = g:
+// normal component fixed (a = 1, g = free stream), tangential zero-gradient (b = 1, g = 0).
+VelocityBcCoefs_0 {          // x-velocity: normal on left/right, tangential on bottom/top
+   U = 0.2
+   A1 = 15.0 * PI / 180.0
+   T_SW = 5.0
+   T_RAMP = 0.1
+   acoef_function_0 = "1.0"
+   acoef_function_1 = "1.0"
+   acoef_function_2 = "0.0"
+   acoef_function_3 = "0.0"
+   bcoef_function_0 = "0.0"
+   bcoef_function_1 = "0.0"
+   bcoef_function_2 = "1.0"
+   bcoef_function_3 = "1.0"
+   gcoef_function_0 = "U * cos(A1 * min(max((t - T_SW) / T_RAMP, 0), 1)^2 * (3 - 2 * min(max((t - T_SW) / T_RAMP, 0), 1)))"
+   gcoef_function_1 = "U * cos(A1 * min(max((t - T_SW) / T_RAMP, 0), 1)^2 * (3 - 2 * min(max((t - T_SW) / T_RAMP, 0), 1)))"
+   gcoef_function_2 = "0.0"
+   gcoef_function_3 = "0.0"
+}
+
+VelocityBcCoefs_1 {          // y-velocity: tangential on left/right, normal on bottom/top
+   U = 0.2
+   A1 = 15.0 * PI / 180.0
+   T_SW = 5.0
+   T_RAMP = 0.1
+   acoef_function_0 = "0.0"
+   acoef_function_1 = "0.0"
+   acoef_function_2 = "1.0"
+   acoef_function_3 = "1.0"
+   bcoef_function_0 = "1.0"
+   bcoef_function_1 = "1.0"
+   bcoef_function_2 = "0.0"
+   bcoef_function_3 = "0.0"
+   gcoef_function_0 = "0.0"
+   gcoef_function_1 = "0.0"
+   gcoef_function_2 = "U * sin(A1 * min(max((t - T_SW) / T_RAMP, 0), 1)^2 * (3 - 2 * min(max((t - T_SW) / T_RAMP, 0), 1)))"
+   gcoef_function_3 = "U * sin(A1 * min(max((t - T_SW) / T_RAMP, 0), 1)^2 * (3 - 2 * min(max((t - T_SW) / T_RAMP, 0), 1)))"
+}
+
+VelocityInitialConditions {  // u = U everywhere at t = 0, as SoRoLily (angle 0)
+   function_0 = "0.2"
+   function_1 = "0.0"
+}
 
 IBHierarchyIntegrator {
    start_time          = 0.0
@@ -94,7 +142,7 @@ CartesianGeometry {
    domain_boxes       = [ (0,0),(Nx - 1,Nx - 1) ]
    x_lo               = 0,0
    x_up               = Lx,Lx
-   periodic_dimension = 1,1    // doubly periodic, as IB2d
+   periodic_dimension = 0,0    // real boundaries (VelocityBcCoefs_*), as SoRoLily
 }
 
 GriddingAlgorithm {
