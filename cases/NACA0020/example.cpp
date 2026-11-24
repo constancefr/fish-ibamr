@@ -39,6 +39,8 @@
 #include <ibtk/muParserCartGridFunction.h>
 #include <ibtk/muParserRobinBcCoefs.h>
 
+#include "NewInterpolatorIBMethod.h"
+
 // Set up application namespace declarations
 #include <ibamr/app_namespaces.h>
 
@@ -119,7 +121,13 @@ main(int argc, char* argv[])
             TBOX_ERROR("Unsupported solver type: " << solver_type << "\n"
                                                    << "Valid options are: COLLOCATED, STAGGERED");
         }
-        Pointer<IBMethod> ib_method_ops = new IBMethod("IBMethod", app_initializer->getComponentDatabase("IBMethod"));
+
+        // Pointer<IBMethod> ib_method_ops = new IBMethod("IBMethod", app_initializer->getComponentDatabase("IBMethod"));
+        const double alpha_new_interpolator = input_db->getDoubleWithDefault("ALPHA_NEW_INTERPOLATOR", 0.0);
+        pout << "ALPHA_NEW_INTERPOLATOR = " << alpha_new_interpolator << " 1/(Pa s)\n";
+        Pointer<NewInterpolatorIBMethod> ib_method_ops =
+            new NewInterpolatorIBMethod("IBMethod", app_initializer->getComponentDatabase("IBMethod"), alpha_new_interpolator);
+        
         Pointer<IBHierarchyIntegrator> time_integrator =
             new IBExplicitHierarchyIntegrator("IBHierarchyIntegrator",
                                               app_initializer->getComponentDatabase("IBHierarchyIntegrator"),

@@ -2,7 +2,8 @@
 Run records for IBAMR cases (adapted from fish-ib2d common/run_records.py at
 9b21eda). Every run folder gets a run_info.json -- the source of truth for
 that run -- and results/index.csv is generated from those files, one row per
-run, every field a column. Indexes are never edited by hand: rebuild them.
+run, every field a column. results/index_trimmed.csv has the same rows but only
+the TRIMMED_COLUMNS below. Indexes are never edited by hand: rebuild them.
 
 The job script (e.g. cases/NACA0020/run_naca.sbatch) calls, in order:
     python3 run_records.py provenance CASE_DIR RUN_DIR             # at job start: code state
@@ -24,6 +25,34 @@ from datetime import datetime
 from pathlib import Path
 
 MAX_UNTRACKED_BYTES = 200_000  # untracked files larger than this are listed, not copied into code.diff
+
+# Columns of index_trimmed.csv, in order: full index.csv names (paths in
+# run_info.json), plus derived.* and timing.wall_min, computed by _derived().
+# A run without one of these gets a blank cell.
+TRIMMED_COLUMNS = [
+    # identity
+    'folder', 'run.tag', 'run.set', 'run.job_id',
+    # fluid inputs
+    'inputs.input2d.MU', 'inputs.input2d.RHO',
+    'inputs.case_params.flow.U', 'inputs.case_params.flow.aoa_deg',
+    # numerics inputs
+    'inputs.input2d.Nx', 'inputs.input2d.Lx', 'inputs.input2d.DT', 'inputs.input2d.END_TIME',
+    'inputs.input2d.DELTA_FUNCTION', 'inputs.input2d.CONVECTIVE_OP_TYPE', 'inputs.input2d.ALPHA_SLIP',
+    # structure inputs
+    'inputs.case_params.geom.E_flex', 'inputs.case_params.geom.target_stiffness_factor',
+    'inputs.case_params.geom.fill_density_multiplier',
+    # derived
+    'derived.dx_mm', 'derived.ds_dx_edge', 'derived.ds_dx_fill', 'derived.cfl_freestream',
+    # structure
+    'mesh.n_points', 'mesh.n_springs', 'mesh.n_target_points', 'mesh.k_Target',
+    # outcome
+    'outcome.status', 'outcome.last_time', 'outcome.nan_in_log',
+    # cost
+    'timing.wall_min', 'timing.ms_per_step', 'run.mpi_processes', 'run.cpu',
+    'memory.max_rss_mb', 'outputs.size_mb',
+    # provenance
+    'provenance.commit', 'provenance.uncommitted_changes',
+]
 
 
 def read_input2d(path):
@@ -163,11 +192,42 @@ def _flatten(d, prefix=''):
     return out
 
 
+def _derived(row):
+    '''Quantities computed from a flattened row; any whose inputs are missing are left out.'''
+    def num(key):
+        v = row.get(key)
+        return float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) else None
+
+    out = {}
+    lx, nx, dt, u = (num(k) for k in ('inputs.input2d.Lx', 'inputs.input2d.Nx',
+                                      'inputs.input2d.DT', 'inputs.case_params.flow.U'))
+    dx = lx / nx if lx and nx else None
+    if dx:
+        out['derived.dx_mm'] = round(1000 * dx, 4)
+        for name in ('edge', 'fill'):
+            if (ds := num(f'mesh.{name}_spacing')) is not None:
+                out[f'derived.ds_dx_{name}'] = round(ds / dx, 3)
+        if dt is not None and u is not None:
+            out['derived.cfl_freestream'] = round(u * dt / dx, 5)  # free-stream U, not the peak velocity
+    if (wall := num('timing.wall_s')) is not None:
+        out['timing.wall_min'] = round(wall / 60, 1)
+    return out
+
+
+def _write_csv(path, rows, columns):
+    with open(path, 'w', newline='') as f:
+        writer = csv.DictWriter(f, columns, restval='', extrasaction='ignore')
+        writer.writeheader()
+        writer.writerows(rows)
+
+
 def write_index(results_dir):
     '''
     results_dir/index.csv: one row per run_info.json at any depth below
     results_dir, every field a column, plus `folder` (the run's path relative
-    to results_dir). Fills in memory.max_rss_mb from sacct where missing.
+    to results_dir) and the _derived() columns. results_dir/index_trimmed.csv:
+    the same rows, TRIMMED_COLUMNS only. Fills in memory.max_rss_mb from sacct
+    where missing.
     '''
     results_dir = Path(results_dir)
     rows = []
@@ -178,14 +238,13 @@ def write_index(results_dir):
             if info['memory']['max_rss_mb'] is None and info['run']['job_id']:
                 info['memory']['max_rss_mb'] = _sacct_max_rss_mb(info['run']['job_id'])
                 write_run_info(root, info)
-            rows.append({'folder': str(Path(root).relative_to(results_dir)), **_flatten(info)})
+            row = {'folder': str(Path(root).relative_to(results_dir)), **_flatten(info)}
+            rows.append({**row, **_derived(row)})
     rows.sort(key=lambda r: str(r.get('timing.start') or ''))
-    path = results_dir / 'index.csv'
-    with open(path, 'w', newline='') as f:
-        writer = csv.DictWriter(f, list(dict.fromkeys(k for r in rows for k in r)))
-        writer.writeheader()
-        writer.writerows(rows)
-    return path
+    full, trimmed = results_dir / 'index.csv', results_dir / 'index_trimmed.csv'
+    _write_csv(full, rows, list(dict.fromkeys(k for r in rows for k in r)))
+    _write_csv(trimmed, rows, TRIMMED_COLUMNS)
+    return full, trimmed
 
 
 if __name__ == '__main__':
@@ -196,6 +255,6 @@ if __name__ == '__main__':
         record(args[0], int(args[1]), int(args[2]), int(args[3]))
     elif cmd == 'index':
         for p in args:
-            print('wrote', write_index(p))
+            print('wrote', *write_index(p))
     else:
         sys.exit(__doc__)

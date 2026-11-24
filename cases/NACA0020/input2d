@@ -20,6 +20,9 @@ END_TIME = 10.0              // [s], IB2d's run length (full schedule)
 VIZ_INTERVAL  = 250          // steps: 0.05 s, IB2d's field_interval
 DATA_INTERVAL = 250
 
+// new velocity interpolation: U_half = J u_half + ALPHA_NEW_INTERPOLATOR * F_half
+ALPHA_NEW_INTERPOLATOR = 0.0 // 0 -> standard IB
+
 // solver
 DELTA_FUNCTION      = "IB_4"           // Peskin's 4-point kernel, as IB2d's Supp.give_Delta_Kernel
 CONVECTIVE_OP_TYPE  = "CUI"       // CUI
