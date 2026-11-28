@@ -132,7 +132,7 @@ def draw_field(ax, xs, ys, w, outline, cmap, levels):
     return cf
 
 
-def main(out):
+def main(out, frames_dir=None):
     import matplotlib
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt
@@ -142,6 +142,12 @@ def main(out):
     flow = wing_case.load_case_params()['flow']
     n_out_ibamr = int(np.load(HERE / 'wing_mesh.npz')['n_outline'])
     with tempfile.TemporaryDirectory() as tmp:
+        # frames directory for reruns (to skip those already seen)
+        frames_dir = Path(frames_dir) if frames_dir else Path(tmp)
+        frames_dir.mkdir(parents=True, exist_ok=True)
+        n_done = len(list(frames_dir.glob('cmp_*.png')))
+        if n_done:
+            print(f'resuming: {n_done} frames already drawn in {frames_dir}', flush=True)
         src = {}
         print('extracting SoRoLily frames ...', flush=True)
         for p, panel in enumerate(PANELS):
@@ -155,6 +161,9 @@ def main(out):
                 src[p] = (np.load(folder / 'viz_IB2d' / 'wing_history.npz'),
                           int(np.load(folder / 'wing_mesh.npz')['n_outline']))
         for k in range(N_FRAMES):
+            png = frames_dir / f'cmp_{k:04d}.png'
+            if png.exists():
+                continue #skip frames already seen in previous runs
             fig, axs = plt.subplots(NROWS, NCOLS, figsize=(5.2 * NCOLS, 3.3 * NROWS))
             cf = None
             for p, ax in enumerate(axs.flat):
@@ -178,11 +187,14 @@ def main(out):
             t = k * FRAME_DT
             fig.suptitle(f't = {t:5.2f} s     angle of attack {np.degrees(wing_case.aoa_rad(t, flow)):4.1f}°',
                          fontsize=13)
-            fig.savefig(Path(tmp) / f'cmp_{k:04d}.png', dpi=80)
+            # fig.savefig(Path(tmp) / f'cmp_{k:04d}.png', dpi=80)
+            part = png.with_name(png.stem + '.part.png')
+            fig.savefig(part, dpi=80)
+            part.rename(png)
             plt.close(fig)
             if k % 20 == 0:
                 print(f'frame {k}/{N_FRAMES - 1}', flush=True)
-        subprocess.run(['ffmpeg', '-v', 'error', '-y', '-framerate', '20', '-i', str(Path(tmp) / 'cmp_%04d.png'),
+        subprocess.run(['ffmpeg', '-v', 'error', '-y', '-framerate', '20', '-i', str(frames_dir / 'cmp_%04d.png'),
                         '-vf', 'pad=ceil(iw/2)*2:ceil(ih/2)*2', '-c:v', 'libx264', '-pix_fmt', 'yuv420p',
                         str(out)], check=True)
     print(f'wrote {out}: {N_FRAMES} frames')

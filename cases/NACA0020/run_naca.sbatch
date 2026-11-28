@@ -18,27 +18,30 @@ set -euo pipefail
 
 CASE="$HOME/finray_fsi/fish-ibamr/cases/NACA0020"
 RECORDS="$HOME/finray_fsi/fish-ibamr/common/run_records.py"
-VISIT="$HOME/opt/visit/visit3_5_0.linux-x86_64/bin/visit"
 export TAG="${TAG:-$SLURM_JOB_NAME}"
 NAME="${TAG}_${SLURM_JOB_ID}"
 RUN="/disk/scratch/$USER/$NAME"
 DEST="$CASE/results/$NAME"
+export TMPDIR="/disk/scratch/$USER/tmp_$NAME"   # node /tmp can be full: mpirun, VisIt, Python temp files go here
 START=$(date +%s)
 RC=0
 
 finish() {
     local end=$(date +%s)
     cd /
+    # movie first, from node scratch (fast local reads); skipped at the time limit so the copy-back gets the time
+    if [ "$RC" -ne 143 ]; then
+        bash -c 'source /opt/conda/etc/profile.d/conda.sh && conda activate ib2d && MPLBACKEND=Agg python "$0" "$1"' \
+            "$CASE/make_run_movie.py" "$RUN" || echo "movie failed"
+    fi
     mkdir -p "$CASE/results" && cp -r "$RUN" "$DEST" && rm -rf "$RUN"
     python3 "$RECORDS" record "$DEST" "$START" "$end" "$RC" || echo "run record failed"
     python3 "$RECORDS" index "$CASE/results" || echo "index failed"
-    "$VISIT" -cli -nowin -s "$HOME/finray_fsi/ibamr_examples/make_vorticity_movie.py" -- \
-        "$DEST" "$DEST/vorticity.mp4" || true   # VisIt exits non-zero even on success
-    [ -f "$DEST/vorticity.mp4" ] || echo "movie failed"
+    rm -rf "$TMPDIR"
 }
 trap finish EXIT
 
-mkdir -p "$RUN" && cd "$RUN"
+mkdir -p "$RUN" "$TMPDIR" && cd "$RUN"
 cp "$CASE"/{input2d,wing.vertex,wing.spring,wing.target,case_params.json,mesh_info.json} .
 for kv in ${SET:-}; do
     key="${kv%%=*}"

@@ -11,6 +11,7 @@ read from that run's own input2d copy (the one SET modified at submission).
 '''
 
 import re
+import shutil
 import sys
 from pathlib import Path
 
@@ -69,6 +70,9 @@ def main(out, runs):
     for a in alphas:
         m.PANELS += [grid.get((a, 0)), grid.get((a, 1))]   # None leaves the cell blank
     m.NROWS, m.NCOLS = 1 + len(alphas), 2
+    frames = out.parent / (out.stem + '_frames')
+    m.main(out, frames_dir = frames)
+    shutil.rmtree(frames)
     m.main(out)
 
 
